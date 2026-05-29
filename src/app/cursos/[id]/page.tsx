@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { Header } from "../../_components/header";
@@ -67,12 +67,13 @@ export default function GroupPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [content, setContent] = useState("");
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
 
   const [openedPostId, setOpenedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
 
-  async function loadRoom() {
+  const loadRoom = useCallback(async () => {
     try {
       const response = await api.get(`/rooms/${slug}`);
 
@@ -80,9 +81,9 @@ export default function GroupPage() {
     } catch (error) {
       console.log(error);
     }
-  }
+  }, [slug]);
 
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
 
@@ -99,7 +100,7 @@ export default function GroupPage() {
     } catch (error) {
       console.log(error);
     }
-  }
+  }, [slug]);
 
   async function loadComments(postId: string) {
     try {
@@ -132,13 +133,11 @@ export default function GroupPage() {
   }
 
   async function handleCreatePost() {
-    if (!content.trim()) {
+    if (!content.trim() || !room || isCreatingPost) {
       return;
     }
 
-    if (!room) {
-      return;
-    }
+    setIsCreatingPost(true);
 
     try {
       const token = localStorage.getItem("token");
@@ -158,9 +157,11 @@ export default function GroupPage() {
 
       setContent("");
 
-      loadPosts();
+      await loadPosts();
     } catch (error) {
       console.log(error);
+    } finally {
+      setIsCreatingPost(false);
     }
   }
 
@@ -223,9 +224,13 @@ export default function GroupPage() {
       return;
     }
 
-    loadRoom();
-    loadPosts();
-  }, [slug]);
+    async function loadData() {
+      await loadRoom();
+      await loadPosts();
+    }
+
+    loadData();
+  }, [slug, loadRoom, loadPosts]);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -277,10 +282,12 @@ export default function GroupPage() {
               </div>
 
               <button
+                type="button"
                 onClick={handleCreatePost}
-                className="rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white"
+                disabled={isCreatingPost}
+                className={`rounded-xl px-6 py-3 font-semibold text-white transition ${isCreatingPost ? "bg-slate-400 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-700"}`}
               >
-                Publicar
+                {isCreatingPost ? "Publicando..." : "Publicar"}
               </button>
             </div>
           </div>
